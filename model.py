@@ -30,6 +30,7 @@ class TransformerAutoEncoder(torch.nn.Module):
             n_cats, 
             n_nums,
             n_ords,
+            num_classes,
             hidden_size=1024, 
             num_subspaces=8,
             embed_dim=128, 
@@ -45,6 +46,7 @@ class TransformerAutoEncoder(torch.nn.Module):
         self.n_cats = n_cats
         self.n_nums = n_nums
         self.n_ords = n_ords
+        self.num_classes = num_classes
         self.num_subspaces = num_subspaces
         self.num_heads = num_heads
         self.embed_dim = embed_dim
@@ -97,7 +99,10 @@ class TransformerAutoEncoder(torch.nn.Module):
         w_cats, w_nums, w_ords = self.split(mask * self.emphasis + (1 - mask) * (1 - self.emphasis))
 
         cat_loss = self.task_weights[0] * torch.mul(w_cats, bce_logits(x_cats, y_cats, reduction='none'))
-        num_loss = self.task_weights[1] * torch.mul(w_nums, mse(x_nums, y_nums, reduction='none'))
+        if self.num_classes == 1 or True:
+            num_loss = self.task_weights[1] * torch.mul(w_nums, mse(x_nums, y_nums, reduction='none'))
+        else:
+            num_loss = self.task_weights[1] * torch.mul(w_nums, bce_logits(x_nums, y_nums, reduction='none'))
         ord_loss = self.task_weights[2] * torch.mul(w_ords, bce_logits(x_ords, y_ords, reduction='none'))
 
         #reconstruction_loss = torch.cat([cat_loss, num_loss], dim=1) if reduction == 'none' else cat_loss.mean() + num_loss.mean()

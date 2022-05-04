@@ -32,6 +32,7 @@ def get_data():
 
     target = 'target'
     idcol = 'ID'
+    num_classes = 2
 
     nan = -10
 
@@ -70,7 +71,8 @@ def get_data():
     # STACK
     X = np.hstack([X_cat, X_nums, X_ord])
     y = train_data[target].to_numpy().reshape(-1, 1)
-    print("cats: %s nums: %s ords: %s" % (X_cat.shape[1], X_nums.shape[1], X_ord.shape[1]))
+    print("COLS: cats: %s nums: %s ords: %s" % (X_cat.shape[1], X_nums.shape[1], X_ord.shape[1]))
+    print("ROWS: cats: %s nums: %s ords: %s y: %s" % (X_cat.shape[0], X_nums.shape[0], X_ord.shape[0], y.shape[0]))
 
     # repeats = [  2,  2,  2,  4,  4,  4,  8,  8,  7, 15,  14]
     # probas =  [.95, .4, .7, .9, .9, .9, .9, .9, .9, .9, .25]
@@ -85,7 +87,7 @@ def get_data():
     swap_probas = swap_probs_cat + swap_probs_nums + swap_probs_ord
     assert len(swap_probas) == X.shape[1]
 
-    return X, y, X_cat.shape[1], X_nums.shape[1], X_ord.shape[1], swap_probas
+    return X, y, train_data.shape, test_data.shape, X_cat.shape[1], X_nums.shape[1], X_ord.shape[1], swap_probas, num_classes
 
 
 class SingleDataset(Dataset):
