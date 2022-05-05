@@ -34,6 +34,9 @@ def get_data():
 
     # TODO: if ohe, then keep ohe, not numeric
     # TODO: QuantileTransform ohe if numeric before ohe'ing
+    # TODO: MICE imputation:
+    # https://scikit-learn.org/stable/modules/impute.html#multivariate-feature-imputation
+    # https://towardsdatascience.com/whats-the-best-way-to-handle-nan-values-62d50f738fc
 
     target = 'target'
     idcol = 'ID'
@@ -55,6 +58,10 @@ def get_data():
     X_nums = sc.fit_transform(X_nums)
     # impute out of bounds for neural network, after quantile transformer
     X_nums = np.nan_to_num(X_nums, nan=nan)
+    # TODO
+    # from sklearn.experimental import enable_iterative_imputer
+    # from sklearn.impute import IterativeImputer
+    # imp = IterativeImputer(max_iter=10, random_state=0)
 
     # OHE
     X_cat = np.vstack([
