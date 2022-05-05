@@ -23,6 +23,11 @@ def get_data():
     cat_names = [x for x in cat_names if x not in num_names]
 
     ord_names = set(catgen_names + ohe_names + num_names).difference(num_names + cat_names)
+
+    num_names = ['v50']
+    ord_names = []
+    cat_names = []
+
     print("num_names: %s" % num_names)
     print("cat_names: %s" % cat_names)
     print("ord_names: %s" % ord_names)
@@ -56,17 +61,19 @@ def get_data():
         train_data[cat_names].to_numpy(),
         test_data[cat_names].to_numpy()
     ])
-    encoder = OneHotEncoder(sparse=False)
-    X_cat = encoder.fit_transform(X_cat)
+    if X_cat.shape[1] > 0:
+        encoder = OneHotEncoder(sparse=False)
+        X_cat = encoder.fit_transform(X_cat)
 
     # High-dimensional CATS
     X_ord = np.vstack([
         train_data[ord_names].to_numpy(),
         test_data[ord_names].to_numpy()
     ])
-    encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=nan)
-    X_ord = encoder.fit_transform(X_ord)
-    X_ord = np.nan_to_num(X_ord, nan=nan)
+    if X_ord.shape[1] > 0:
+        encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=nan)
+        X_ord = encoder.fit_transform(X_ord)
+        X_ord = np.nan_to_num(X_ord, nan=nan)
 
     # STACK
     X = np.hstack([X_cat, X_nums, X_ord])

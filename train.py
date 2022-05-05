@@ -21,7 +21,7 @@ def go():
     #  get data
     X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes = get_data()
 
-    if True:
+    if False:
         features = np.load('dae_features.npy')
     else:
         features = get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes)
@@ -93,13 +93,15 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
     np.save('train_preds.npy', train_preds)
     np.save('test_preds.npy', test_preds)
 
-def xgb_preds(train_X, train_y, valid_X):
+
+def xgb_preds(train_X, train_y, valid_X, valid_y):
     import xgboost as xgb
     model = xgb.XGBClassifier(num_class=1, objective='binary:logistic', early_stopping_rounds=10)
     eval_set = [(valid_X, valid_y)]
     model.fit(train_X, train_y, eval_set=eval_set, eval_metric='logloss')
     preds = model.predict_proba(valid_X)
     return preds
+
 
 def get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes):
     # Hyper-params

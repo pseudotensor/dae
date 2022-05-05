@@ -38,7 +38,7 @@ class TransformerAutoEncoder(torch.nn.Module):
             dropout=0, 
             feedforward_dim=512, 
             emphasis=.75, 
-            task_weights=[10, 14, 0],
+            task_weights=None,
             mask_loss_weight=2,
         ):
         super().__init__()
@@ -51,6 +51,8 @@ class TransformerAutoEncoder(torch.nn.Module):
         self.num_heads = num_heads
         self.embed_dim = embed_dim
         self.emphasis = emphasis
+        if task_weights is None:
+            task_weights = [n_cats, n_nums, n_ords]
         self.task_weights = np.array(task_weights) / sum(task_weights)
         self.mask_loss_weight = mask_loss_weight
 
@@ -99,15 +101,23 @@ class TransformerAutoEncoder(torch.nn.Module):
         w_cats, w_nums, w_ords = self.split(mask * self.emphasis + (1 - mask) * (1 - self.emphasis))
 
         cat_loss = self.task_weights[0] * torch.mul(w_cats, bce_logits(x_cats, y_cats, reduction='none'))
-        if self.num_classes == 1 or True:
-            num_loss = self.task_weights[1] * torch.mul(w_nums, mse(x_nums, y_nums, reduction='none'))
-        else:
-            num_loss = self.task_weights[1] * torch.mul(w_nums, bce_logits(x_nums, y_nums, reduction='none'))
+        num_loss = self.task_weights[1] * torch.mul(w_nums, mse(x_nums, y_nums, reduction='none'))
         ord_loss = self.task_weights[2] * torch.mul(w_ords, bce_logits(x_ords, y_ords, reduction='none'))
 
         #reconstruction_loss = torch.cat([cat_loss, num_loss], dim=1) if reduction == 'none' else cat_loss.mean() + num_loss.mean()
-        reconstruction_loss = torch.cat([cat_loss, num_loss, ord_loss],
-                                        dim=1) if reduction == 'none' else cat_loss.mean() + num_loss.mean() + ord_loss.mean()
+        losses = []
+        mean_loss = 0
+        if self.n_cats > 0:
+            losses.append(cat_loss)
+            mean_loss += cat_loss.mean()
+        if self.n_nums > 0:
+            losses.append(num_loss)
+            mean_loss += num_loss.mean()
+        if self.n_ords > 0:
+            losses.append(ord_loss)
+            mean_loss += ord_loss.mean()
+
+        reconstruction_loss = torch.cat(losses, dim=1) if reduction == 'none' else mean_loss
         mask_loss = self.mask_loss_weight * bce_logits(predicted_mask, mask, reduction=reduction)
 
         return reconstruction_loss + mask_loss if reduction == 'mean' else [reconstruction_loss, mask_loss]
