@@ -20,15 +20,15 @@ from sklearn.utils.extmath import softmax
 
 def go(which=1, normtype=1, reuse=False):
     #  get data
-    X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes = get_data(which=which, normtype=normtype)
+    X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes = get_data(which=which, normtype=normtype)
 
-    features_file = 'dae_features_%s_%s_%s_%s_%s.npy' % (n_cats, n_nums, n_ords, num_classes, normtype)
+    features_file = 'dae_features__%s_%s_%s___%s_%s_%s__%s_%s.npy' % (n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, num_classes, normtype)
 
     if reuse:
         assert os.path.isfile(features_file), "No such file %s" % features_file
         features = np.load(features_file)
     else:
-        features = get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file)
+        features = get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file)
 
     make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features)
 
@@ -107,7 +107,7 @@ def xgb_preds(train_X, train_y, valid_X, valid_y):
     return preds
 
 
-def get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file):
+def get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file):
     # Hyper-params
     model_params = dict(
         hidden_size=1024,
@@ -135,6 +135,9 @@ def get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_pro
     # setup model
     model = TransformerAutoEncoder(
         num_inputs=X.shape[1],
+        n_cats_orig=n_cats_orig,
+        n_nums_orig=n_nums_orig,
+        n_ords_orig=n_ords_orig,
         n_cats=n_cats,
         n_nums=n_nums,
         n_ords=n_ords,

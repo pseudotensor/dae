@@ -35,8 +35,8 @@ def get_data(which=1, normtype=1):
         idcol = 'ID'
         num_classes = 2
 
-    print("num_names: %s" % num_names)
     print("cat_names: %s" % cat_names)
+    print("num_names: %s" % num_names)
     print("ord_names: %s" % ord_names)
 
     # TODO: if ohe, then keep ohe, not numeric
@@ -51,16 +51,25 @@ def get_data(which=1, normtype=1):
         train_data[num_names].to_numpy(),
         test_data[num_names].to_numpy()
     ])
-    if normtype == 1:
+    sc = None
+    if normtype == 0:
+        # no normalization
+        pass
+    elif normtype == 1:
         X_nums = (X_nums - X_nums.mean(0)) / X_nums.std(0)
+    elif normtype == 2:
         from sklearn.preprocessing import StandardScaler
         sc = StandardScaler()
-    else:
+    elif normtype == 3:
         from sklearn.preprocessing import QuantileTransformer
         sc = QuantileTransformer(n_quantiles=2000,
                                  output_distribution='normal',
                                  random_state=42)
-    X_nums = sc.fit_transform(X_nums)
+    else:
+        raise RuntimeError("No such normtype: %s" % normtype)
+    if sc is not None:
+        X_nums = sc.fit_transform(X_nums)
+
     # impute out of bounds for neural network, after quantile transformer
     X_nums = np.nan_to_num(X_nums, nan=nan)
     # TODO
@@ -93,12 +102,30 @@ def get_data(which=1, normtype=1):
     print("COLS: cats: %s nums: %s ords: %s" % (X_cat.shape[1], X_nums.shape[1], X_ord.shape[1]))
     print("ROWS: cats: %s nums: %s ords: %s y: %s" % (X_cat.shape[0], X_nums.shape[0], X_ord.shape[0], y.shape[0]))
 
+
+    # Something suboptimal from dae branch
+    # epoch  2000 - loss 0.559786 - 20.000000
+    # 0.84188
+
+    # normal:
+    # epoch  2000 - loss 0.624798 - 9.000000 sec per epoch0.8412105585745847
+
+    # original before even changed how swap probs set:
+    # epoch  1869 - loss 0.606126 - 21.000000 sec per epoch
+
+
     if which == 1:
-        repeats = [  2,  2,  2,  4,  4,  4,  8,  8,  7, 15,  14]
-        probas =  [.95, .4, .7, .9, .9, .9, .9, .9, .9, .9, .25]
-        # import sys
-        # sys.exit(0)
-        swap_probas = sum([[p] * r for p, r in zip(probas, repeats)], [])
+        orig = False
+        if orig:
+            repeats = [2,  2,  2,  4,  4,  4,  8,  8,  7, 15,  14]
+            probas = [.95, .4, .7, .9, .9, .9, .9, .9, .9, .9, .25]
+            swap_probas = sum([[p] * r for p, r in zip(probas, repeats)], [])
+        else:
+            # generic specification also does just fine:
+            # /home/jon/Denoise-Transformer-AutoEncoder
+            # f3f48918bd93921b8b6777a4fc3fb87d29e6b22b
+            # epoch  2000 - loss 0.624798 - 9.000000 sec per epoch0.8412105585745847
+            swap_probas = [0.9 if i < X_cat.shape[1] else 0.25 for i in range(X.shape[1])]
     else:
         swap_probs_cat = [0.25] * X_cat.shape[1]
         swap_probs_nums = [0.9] * X_nums.shape[1]
@@ -107,7 +134,10 @@ def get_data(which=1, normtype=1):
 
     assert len(swap_probas) == X.shape[1]
 
-    return X, y, train_data.shape, test_data.shape, X_cat.shape[1], X_nums.shape[1], X_ord.shape[1], swap_probas, num_classes
+    return X, y, train_data.shape, test_data.shape, \
+           len(cat_names), len(num_names), len(ord_names), \
+           X_cat.shape[1], X_nums.shape[1], X_ord.shape[1], \
+           swap_probas, num_classes
 
 
 class SingleDataset(Dataset):

@@ -27,7 +27,10 @@ class TransformerAutoEncoder(torch.nn.Module):
     def __init__(
             self, 
             num_inputs, 
-            n_cats, 
+            n_cats_orig,
+            n_nums_orig,
+            n_ords_orig,
+            n_cats,
             n_nums,
             n_ords,
             num_classes,
@@ -52,7 +55,7 @@ class TransformerAutoEncoder(torch.nn.Module):
         self.embed_dim = embed_dim
         self.emphasis = emphasis
         if task_weights is None:
-            task_weights = [n_cats, n_nums, n_ords]
+            task_weights = [n_cats_orig, n_nums_orig, n_ords_orig]
         self.task_weights = np.array(task_weights) / sum(task_weights)
         self.mask_loss_weight = mask_loss_weight
 
