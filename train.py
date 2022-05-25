@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 from datetime import datetime
@@ -17,14 +18,17 @@ from sklearn.utils.extmath import softmax
 #        return softmax(d_2d)
 
 
-def go():
+def go(which=1, normtype=1, reuse=False):
     #  get data
-    X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes = get_data()
+    X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes = get_data(which=which, normtype=normtype)
 
-    if False:
-        features = np.load('dae_features.npy')
+    features_file = 'dae_features_%s_%s_%s_%s_%s.npy' % (n_cats, n_nums, n_ords, num_classes, normtype)
+
+    if reuse:
+        assert os.path.isfile(features_file), "No such file %s" % features_file
+        features = np.load(features_file)
     else:
-        features = get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes)
+        features = get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file)
 
     make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features)
 
@@ -45,7 +49,7 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
     test_preds = []
 
     if num_classes == 1:
-        skf = KFold(n_splits=5, random_state=42)
+        skf = KFold(n_splits=5)#, random_state=42)
         split_gen = skf.split(X_train)
     else:
         skf = StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
@@ -103,7 +107,7 @@ def xgb_preds(train_X, train_y, valid_X, valid_y):
     return preds
 
 
-def get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes):
+def get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file):
     # Hyper-params
     model_params = dict(
         hidden_size=1024,
@@ -181,10 +185,10 @@ def get_features(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_pro
         for x in dl:
             features.append(model.feature(x.cuda()).detach().cpu().numpy())
     features = np.vstack(features)
-    np.save('dae_features.npy', features)
+    np.save(features_file, features)
 
     return features
 
 
 if __name__ == "__main__":
-    go()
+    go(which=1, normtype=1, reuse=False)

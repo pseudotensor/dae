@@ -4,7 +4,7 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from torch.utils.data import Dataset
 
 
-def get_data(which=1):
+def get_data(which=1, normtype=1):
     if which == 1:
         train_data = pd.read_csv('/home/jon/kaggle/tabular-playground-series-feb-2021/train.csv')
         test_data = pd.read_csv('/home/jon/kaggle/tabular-playground-series-feb-2021/test.csv')
@@ -12,6 +12,7 @@ def get_data(which=1):
         cat_names = [x for x in train_data.columns if 'cat' in x]
         ord_names = []
         target = 'target'
+        num_classes = 1
     else:
         train_data = pd.read_csv('/home/jon/h2oai-benchmarks/Data/BNPParibas/train.csv')
         test_data = pd.read_csv('/home/jon/h2oai-benchmarks/Data/BNPParibas/test.csv')
@@ -32,6 +33,7 @@ def get_data(which=1):
         cat_names = []
         target = 'target'
         idcol = 'ID'
+        num_classes = 2
 
     print("num_names: %s" % num_names)
     print("cat_names: %s" % cat_names)
@@ -42,9 +44,6 @@ def get_data(which=1):
     # TODO: MICE imputation:
     # https://scikit-learn.org/stable/modules/impute.html#multivariate-feature-imputation
     # https://towardsdatascience.com/whats-the-best-way-to-handle-nan-values-62d50f738fc
-
-    num_classes = 2
-
     nan = -10
 
     # NUMERIC
@@ -52,12 +51,15 @@ def get_data(which=1):
         train_data[num_names].to_numpy(),
         test_data[num_names].to_numpy()
     ])
-    #X_nums = (X_nums - X_nums.mean(0)) / X_nums.std(0)
-    #sc = StandardScaler()
-    from sklearn.preprocessing import QuantileTransformer
-    sc = QuantileTransformer(n_quantiles=2000,
-                             output_distribution='normal',
-                             random_state=42)
+    if normtype == 1:
+        X_nums = (X_nums - X_nums.mean(0)) / X_nums.std(0)
+        from sklearn.preprocessing import StandardScaler
+        sc = StandardScaler()
+    else:
+        from sklearn.preprocessing import QuantileTransformer
+        sc = QuantileTransformer(n_quantiles=2000,
+                                 output_distribution='normal',
+                                 random_state=42)
     X_nums = sc.fit_transform(X_nums)
     # impute out of bounds for neural network, after quantile transformer
     X_nums = np.nan_to_num(X_nums, nan=nan)
