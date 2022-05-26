@@ -4,6 +4,8 @@ import numpy as np
 
 bce_logits = torch.nn.functional.binary_cross_entropy_with_logits
 mse = torch.nn.functional.mse_loss
+from torch.nn import functional as F
+cross_entropy = F.cross_entropy
 
 
 class TransformerEncoder(torch.nn.Module):
@@ -103,9 +105,19 @@ class TransformerAutoEncoder(torch.nn.Module):
         y_cats, y_nums, y_ords = self.split(y)
         w_cats, w_nums, w_ords = self.split(mask * self.emphasis + (1 - mask) * (1 - self.emphasis))
 
-        cat_loss = self.task_weights[0] * torch.mul(w_cats, bce_logits(x_cats, y_cats, reduction='none'))
-        num_loss = self.task_weights[1] * torch.mul(w_nums, mse(x_nums, y_nums, reduction='none'))
-        ord_loss = self.task_weights[2] * torch.mul(w_ords, bce_logits(x_ords, y_ords, reduction='none'))
+        cat_loss = num_loss = ord_loss = 0
+
+        if self.n_cats > 0:
+            cat_loss = self.task_weights[0] * torch.mul(w_cats, bce_logits(x_cats, y_cats, reduction='none'))
+        if self.n_nums > 0:
+            num_loss = self.task_weights[1] * torch.mul(w_nums, mse(x_nums, y_nums, reduction='none'))
+
+        if self.n_ords > 0:
+            ord_losses = []
+            for ord in range(self.n_ords):
+                ord_loss1 = self.task_weights[2] * torch.mul(w_ords, cross_entropy(x_ords[ord], y_ords[ord], reduction='none'))
+                ord_losses.append(ord_loss1)
+            ord_loss = torch.stack(ord_losses).mean()
 
         #reconstruction_loss = torch.cat([cat_loss, num_loss], dim=1) if reduction == 'none' else cat_loss.mean() + num_loss.mean()
         losses = []

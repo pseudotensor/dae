@@ -107,11 +107,12 @@ def get_data(which=1, normtype=1):
     # epoch  2000 - loss 0.559786 - 20.000000
     # 0.84188
 
-    # normal:
+    # normal with simple swap probs, does even better for RMSE:
     # epoch  2000 - loss 0.624798 - 9.000000 sec per epoch0.8412105585745847
 
     # original before even changed how swap probs set:
     # epoch  1869 - loss 0.606126 - 21.000000 sec per epoch
+    # epoch  2000 - loss 0.605735 - 23.000000 sec per epoch0.8412340991691792
 
 
     if which == 1:

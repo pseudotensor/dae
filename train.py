@@ -18,7 +18,7 @@ from sklearn.utils.extmath import softmax
 #        return softmax(d_2d)
 
 
-def go(which=1, normtype=1, reuse=False):
+def go(which=1, normtype=1, reuse=False, max_epochs=2001):
     #  get data
     X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes = get_data(which=which, normtype=normtype)
 
@@ -28,12 +28,19 @@ def go(which=1, normtype=1, reuse=False):
         assert os.path.isfile(features_file), "No such file %s" % features_file
         features = np.load(features_file)
     else:
-        features = get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file)
+        features = get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file, max_epochs=max_epochs)
 
     make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features)
 
 
-def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features):
+def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features, use_xgb=True, use_gpu=False):
+
+    sc = None
+    if False and num_classes == 1:
+        from sklearn.preprocessing import StandardScaler
+        sc = StandardScaler()
+        Y = sc.fit_transform(Y)
+
     # downstream supervised regressor
     alpha = 1250  # 1000
     X_train = features[:train_shape[0], :]
@@ -61,19 +68,26 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
         valid_X = X_train[valid_idx]
         actuals = valid_y = Y[valid_idx]
 
-        if num_classes == 1:
-            model = Ridge(alpha=alpha)
+        if use_xgb:
+            model, es = get_xgb_model(use_gpu=use_gpu, num_classes=num_classes)
+            eval_set = [(valid_X, valid_y)]
+            model.fit(train_X, train_y, eval_set=eval_set, eval_metric=model.get_params()['eval_metric'], callbacks=[es])
         else:
-            model = SGDClassifier(loss="log", n_jobs=20, fit_intercept=True)
+            if num_classes == 1:
+                model = Ridge(alpha=alpha)
+            else:
+                model = SGDClassifier(loss="log", n_jobs=20, fit_intercept=True, max_iter=1000, validation_fraction=0.25, early_stopping=True, n_iter_no_change=100)
+            model.fit(train_X, train_y)
+
         models.append(model)
-        model.fit(train_X, train_y)
+        if num_classes == 2 and not use_xgb:
+            print("n_iter_: %s intercept_: %s" % (model.n_iter_, model.intercept_))
 
         if num_classes == 1:
             preds = model.predict(valid_X)
             test_preds.append(model.predict(X_test))
         else:
             preds = model.predict_proba(valid_X)
-            #preds = xgb_preds(train_X, train_y, valid_X)
 
             test_preds1 = model.predict_proba(X_test)
             test_preds.append(test_preds1)
@@ -82,13 +96,15 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
             score = mean_squared_error(actuals, preds, squared=False)
         else:
             print("actuals/preds size: %s %s" % (list(actuals.shape), list(preds.shape)))
-            score = log_loss(actuals, preds)
+            score = log_loss(actuals.ravel(), preds)
+        print("score %s" % score)
 
         # OOF train preds
         train_preds[valid_idx] = preds
 
         scores.append(score)
 
+    print(scores)
     print(np.mean(scores))
 
     # average test preds
@@ -98,16 +114,47 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
     np.save('test_preds.npy', test_preds)
 
 
-def xgb_preds(train_X, train_y, valid_X, valid_y):
+def get_xgb_model(use_gpu=False, num_classes=1):
     import xgboost as xgb
-    model = xgb.XGBClassifier(num_class=1, objective='binary:logistic', early_stopping_rounds=10)
-    eval_set = [(valid_X, valid_y)]
-    model.fit(train_X, train_y, eval_set=eval_set, eval_metric='logloss')
-    preds = model.predict_proba(valid_X)
-    return preds
+    num_class = 1 if num_classes <= 2 else num_classes
+    if num_classes == 2:
+        objective = 'binary:logistic'
+        eval_metric = 'logloss'
+        maximize = False
+    elif num_classes == 1:
+        objective = 'reg:squarederror'
+        eval_metric = 'rmse'
+        maximize = False
+    else:
+        objective = 'multi:softprob'
+        eval_metric = 'mlogloss'
+        maximize = False
+    early_stopping_rounds = 20
+    params = dict(num_class=num_class, objective=objective,
+                  early_stopping_rounds=early_stopping_rounds,
+                  n_jobs=8,
+                  single_precision_histogram=True,
+                  eval_metric=eval_metric,
+                  n_estimators=200,
+                  )
+    if use_gpu:
+        params.update(dict(tree_method='gpu_hist', predictor='gpu_predictor', gpu_id=0))
+    model = xgb.XGBClassifier(**params)
+
+    es = xgb.callback.EarlyStopping(
+        rounds=early_stopping_rounds,
+        #abs_tol=1e-3,
+        min_delta=1e-3,
+        save_best=True,
+        maximize=maximize,
+        data_name="validation_0",
+        metric_name=eval_metric,
+    )
+
+    return model, es
 
 
-def get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file):
+def get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file, max_epochs=2001):
     # Hyper-params
     model_params = dict(
         hidden_size=1024,
@@ -122,7 +169,6 @@ def get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords
     batch_size = 384
     init_lr = 3e-4
     lr_decay = .998
-    max_epochs = 2001
 
     train_dl = DataLoader(
         dataset=SingleDataset(X),
@@ -194,4 +240,4 @@ def get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords
 
 
 if __name__ == "__main__":
-    go(which=1, normtype=1, reuse=False)
+    go(which=2, normtype=1, reuse=False, max_epochs=1)
