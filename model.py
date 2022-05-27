@@ -115,7 +115,7 @@ class TransformerAutoEncoder(torch.nn.Module):
         if self.n_ords > 0:
             ord_losses = []
             for ord in range(self.n_ords):
-                ord_loss1 = self.task_weights[2] * torch.mul(w_ords, cross_entropy(x_ords[ord], y_ords[ord], reduction='none'))
+                ord_loss1 = self.task_weights[2] * torch.mul(w_ords[:, ord], cross_entropy(x_ords[:, ord], y_ords[:, ord], reduction='none'))
                 ord_losses.append(ord_loss1)
             ord_loss = torch.stack(ord_losses).mean()
 

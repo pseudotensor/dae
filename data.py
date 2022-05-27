@@ -26,11 +26,11 @@ def get_data(which=1, normtype=1):
         cat_names = sorted(set(ohe_names))
         cat_names = [x for x in cat_names if x not in num_names]
 
-        ord_names = set(catgen_names + ohe_names + num_names).difference(num_names + cat_names)
+        ord_names = sorted(set(catgen_names + ohe_names + num_names).difference(num_names + cat_names))
 
-        num_names = ['v50']
+        #num_names = ['v50']
         ord_names = []
-        cat_names = []
+        #cat_names = []
         target = 'target'
         idcol = 'ID'
         num_classes = 2
@@ -94,7 +94,7 @@ def get_data(which=1, normtype=1):
     if X_ord.shape[1] > 0:
         encoder = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=nan)
         X_ord = encoder.fit_transform(X_ord)
-        X_ord = np.nan_to_num(X_ord, nan=nan)
+        X_ord = np.nan_to_num(X_ord, nan=nan).astype(int)
 
     # STACK
     X = np.hstack([X_cat, X_nums, X_ord])
@@ -114,6 +114,8 @@ def get_data(which=1, normtype=1):
     # epoch  1869 - loss 0.606126 - 21.000000 sec per epoch
     # epoch  2000 - loss 0.605735 - 23.000000 sec per epoch0.8412340991691792
 
+    # new 0cbfe03946d2168f2ec76a257df0bb3d3cc1be73
+    # epoch  2000 - loss 0.624745 - 20.000000 sec per epoch0.8411460636869601
 
     if which == 1:
         orig = False

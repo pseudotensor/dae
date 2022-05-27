@@ -18,11 +18,11 @@ from sklearn.utils.extmath import softmax
 #        return softmax(d_2d)
 
 
-def go(which=1, normtype=1, reuse=False, max_epochs=2001):
+def go(which=1, normtype=1, reuse=False, max_epochs=2001, use_xgb=True, xgb_use_gpu=False):
     #  get data
     X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes = get_data(which=which, normtype=normtype)
 
-    features_file = 'dae_features__%s_%s_%s___%s_%s_%s__%s_%s.npy' % (n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, num_classes, normtype)
+    features_file = 'dae_features_which%s_max_epochs%s_n_orig_%s_%s_%s___n_%s_%s_%s__%s_%s.npy' % (which, max_epochs, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, num_classes, normtype)
 
     if reuse:
         assert os.path.isfile(features_file), "No such file %s" % features_file
@@ -30,10 +30,10 @@ def go(which=1, normtype=1, reuse=False, max_epochs=2001):
     else:
         features = get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords_orig, n_cats, n_nums, n_ords, swap_probas, num_classes, features_file, max_epochs=max_epochs)
 
-    make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features)
+    make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features, use_xgb=use_xgb, xgb_use_gpu=xgb_use_gpu)
 
 
-def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features, use_xgb=True, use_gpu=False):
+def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords, swap_probas, num_classes, features, use_xgb=True, xgb_use_gpu=False):
 
     sc = None
     if False and num_classes == 1:
@@ -43,6 +43,7 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
 
     # downstream supervised regressor
     alpha = 1250  # 1000
+    features = np.concatenate((features, X[:, n_cats:]), axis=1)
     X_train = features[:train_shape[0], :]
     X_test = features[train_shape[0]:, :]
 
@@ -69,7 +70,7 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
         actuals = valid_y = Y[valid_idx]
 
         if use_xgb:
-            model, es = get_xgb_model(use_gpu=use_gpu, num_classes=num_classes)
+            model, es = get_xgb_model(xgb_use_gpu=xgb_use_gpu, num_classes=num_classes)
             eval_set = [(valid_X, valid_y)]
             model.fit(train_X, train_y, eval_set=eval_set, eval_metric=model.get_params()['eval_metric'], callbacks=[es])
         else:
@@ -114,7 +115,7 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
     np.save('test_preds.npy', test_preds)
 
 
-def get_xgb_model(use_gpu=False, num_classes=1):
+def get_xgb_model(xgb_use_gpu=False, num_classes=1):
     import xgboost as xgb
     num_class = 1 if num_classes <= 2 else num_classes
     if num_classes == 2:
@@ -137,7 +138,7 @@ def get_xgb_model(use_gpu=False, num_classes=1):
                   eval_metric=eval_metric,
                   n_estimators=200,
                   )
-    if use_gpu:
+    if xgb_use_gpu:
         params.update(dict(tree_method='gpu_hist', predictor='gpu_predictor', gpu_id=0))
     model = xgb.XGBClassifier(**params)
 
@@ -240,4 +241,5 @@ def get_features(X, Y, train_shape, test_shape, n_cats_orig, n_nums_orig, n_ords
 
 
 if __name__ == "__main__":
-    go(which=2, normtype=1, reuse=False, max_epochs=1)
+    #go(which=2, normtype=1, reuse=False, max_epochs=2000, use_xgb=True, xgb_use_gpu=False)
+    go(which=2, normtype=1, reuse=True, max_epochs=2000, use_xgb=True, xgb_use_gpu=False)
