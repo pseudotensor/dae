@@ -43,7 +43,8 @@ def make_prediction_model(X, Y, train_shape, test_shape, n_cats, n_nums, n_ords,
 
     # downstream supervised regressor
     alpha = 1250  # 1000
-    features = np.concatenate((features, X[:, n_cats:]), axis=1)
+    # NOTE: Adds original numeric features
+    features = np.concatenate((features, X[:, n_cats:n_cats+n_nums]), axis=1)
     X_train = features[:train_shape[0], :]
     X_test = features[train_shape[0]:, :]
 
